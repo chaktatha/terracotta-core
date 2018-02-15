@@ -20,6 +20,7 @@ package com.tc.net.protocol.tcm;
 
 import com.tc.net.TCSocketAddress;
 import com.tc.net.core.TCConnectionManager;
+import com.tc.net.protocol.transport.ClientConnectionErrorListener;
 import com.tc.net.protocol.transport.ConnectionIDFactory;
 import com.tc.object.session.SessionProvider;
 import com.tc.operatorevent.NodeNameProvider;
@@ -49,6 +50,12 @@ public class TestCommunicationsManager implements CommunicationsManager {
   @Override
   public ClientMessageChannel createClientChannel(ProductID product, SessionProvider provider, int timeout) {
     throw new UnsupportedOperationException(); 
+  }
+
+  @Override
+  public ClientMessageChannel createClientChannel(ProductID product, SessionProvider provider, int timeout
+      , ClientConnectionErrorListener errorListener){
+    throw new UnsupportedOperationException();
   }
 
   @Override

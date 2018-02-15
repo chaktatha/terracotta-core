@@ -29,6 +29,7 @@ import com.tc.net.StripeID;
 import com.tc.net.core.ConnectionInfo;
 import com.tc.net.protocol.NetworkStackID;
 import com.tc.net.protocol.TCNetworkMessage;
+import com.tc.net.protocol.transport.ClientConnectionErrorListener;
 import com.tc.net.protocol.transport.ConnectionID;
 import com.tc.net.protocol.transport.JvmIDUtil;
 import com.tc.net.protocol.transport.MessageTransport;
@@ -54,11 +55,14 @@ public class ClientMessageChannelImpl extends AbstractMessageChannel implements 
   private final SessionProvider           sessionProvider;
   private MessageTransportInitiator       initiator;
   private volatile SessionID              channelSessionID = SessionID.NULL_ID;
+  private final ClientConnectionErrorListener errorListener;
 
   protected ClientMessageChannelImpl(TCMessageFactory msgFactory, TCMessageRouter router,
-                                     SessionProvider sessionProvider, ProductID productId) {
+                                     SessionProvider sessionProvider, ProductID productId,
+                                     ClientConnectionErrorListener errorListener) {
     super(router, logger, msgFactory, StripeID.NULL_ID, productId);
     this.sessionProvider = sessionProvider;
+    this.errorListener = errorListener;
     this.sessionProvider.initProvider();
   }
 
@@ -189,5 +193,10 @@ public class ClientMessageChannelImpl extends AbstractMessageChannel implements 
     if (index < 0) { throw new RuntimeException("unexpected format: " + vmName); }
 
     return Integer.parseInt(vmName.substring(0, index));
+  }
+
+  @Override
+  public ClientConnectionErrorListener getClientConnectionErrorListener() {
+    return this.errorListener;
   }
 }

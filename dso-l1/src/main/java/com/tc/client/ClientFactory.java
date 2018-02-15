@@ -19,6 +19,7 @@
 package com.tc.client;
 
 import com.tc.lang.TCThreadGroup;
+import com.tc.net.protocol.transport.ClientConnectionErrorListener;
 import com.tc.object.ClientBuilder;
 import com.tc.object.DistributedObjectClient;
 import com.tc.object.config.ClientConfig;
@@ -36,5 +37,14 @@ public class ClientFactory {
     return new DistributedObjectClient(config, builder, threadGroup, connectionComponents,
         cluster,
         uuid, name);
+  }
+
+  public static DistributedObjectClient createClient(ClientConfig config, ClientBuilder builder, TCThreadGroup threadGroup,
+                                                     PreparedComponentsFromL2Connection connectionComponents,
+                                                     ClusterInternal cluster,
+                                                     String uuid, String name, ClientConnectionErrorListener errorListener) {
+    return new DistributedObjectClient(config, builder, threadGroup, connectionComponents,
+        cluster,
+        uuid, name, errorListener);
   }
 }

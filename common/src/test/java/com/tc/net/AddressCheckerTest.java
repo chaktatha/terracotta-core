@@ -26,7 +26,7 @@ public class AddressCheckerTest extends TestCase {
 
   public void test() throws Exception {
     AddressChecker ac = new AddressChecker();
-
+    System.out.println(InetAddress.getLocalHost());
     assertTrue(ac.isLegalBindAddress(InetAddress.getByName("127.0.0.1")));
     assertTrue(ac.isLegalBindAddress(InetAddress.getByName("0.0.0.0")));
     assertTrue(ac.isLegalBindAddress(InetAddress.getLocalHost()));

@@ -19,6 +19,7 @@
 package com.tc.net.protocol.tcm;
 
 import com.tc.net.protocol.NetworkLayer;
+import com.tc.net.protocol.transport.ClientConnectionErrorListener;
 import com.tc.net.protocol.transport.MessageTransportInitiator;
 import com.tc.net.protocol.transport.MessageTransportListener;
 import com.tc.object.ClientIDProvider;
@@ -34,5 +35,6 @@ public interface ClientMessageChannel extends MessageChannel, NetworkLayer, Mess
   public ClientHandshakeMessageFactory getClientHandshakeMessageFactory();
 
   public void setMessageTransportInitiator(MessageTransportInitiator initiator);
-  
+
+  public ClientConnectionErrorListener getClientConnectionErrorListener();
 }

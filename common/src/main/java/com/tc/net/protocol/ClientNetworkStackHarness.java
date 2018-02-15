@@ -77,8 +77,8 @@ public class ClientNetworkStackHarness extends LayeredNetworkStackHarness {
     }
   }
   
-  protected ClientConnectionEstablisher createClientConnectionEstablisher() {
-    return transportFactory.createClientConnectionEstablisher();
+  protected ClientConnectionEstablisher createClientConnectionEstablisher(ClientMessageChannel clientMessaheChannel) {
+    return transportFactory.createClientConnectionEstablisher(clientMessaheChannel.getClientConnectionErrorListener());
   }
 
   protected void connectStack() {
@@ -86,7 +86,7 @@ public class ClientNetworkStackHarness extends LayeredNetworkStackHarness {
   //  connect up the channel the end of the chain
     last.setReceiveLayer(channel);
     
-    final ClientConnectionEstablisher cce = createClientConnectionEstablisher();
+    final ClientConnectionEstablisher cce = createClientConnectionEstablisher(channel);
     channel.setMessageTransportInitiator(new MessageTransportInitiator() {
       @Override
       public NetworkStackID openMessageTransport(Collection<ConnectionInfo> dest, ConnectionID connection) throws CommStackMismatchException, IOException, MaxConnectionsExceededException, TCTimeoutException {

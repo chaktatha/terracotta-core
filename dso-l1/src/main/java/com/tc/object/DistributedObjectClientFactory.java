@@ -25,6 +25,7 @@ import com.tc.config.schema.setup.ConfigurationSetupException;
 import com.tc.config.schema.setup.L1ConfigurationSetupManager;
 import com.tc.lang.L1ThrowableHandler;
 import com.tc.lang.TCThreadGroup;
+import com.tc.net.protocol.transport.ClientConnectionErrorListener;
 import com.tc.object.config.ClientConfig;
 import com.tc.object.config.ClientConfigImpl;
 import com.tc.object.config.PreparedComponentsFromL2Connection;
@@ -45,12 +46,14 @@ public class DistributedObjectClientFactory {
   private final List<InetSocketAddress> stripeMemberUris;
   private final ClientBuilder builder;
   private final Properties        properties;
+  private final ClientConnectionErrorListener errorListener;
 
   public DistributedObjectClientFactory(List<InetSocketAddress> stripeMemberUris, ClientBuilder builder,
-                                        Properties properties) {
+                                        Properties properties, ClientConnectionErrorListener errorListener) {
     this.stripeMemberUris = stripeMemberUris;
     this.builder = builder;
     this.properties = properties;
+    this.errorListener = errorListener;
   }
 
   public DistributedObjectClient create() throws InterruptedException, ConfigurationSetupException {
@@ -89,7 +92,8 @@ public class DistributedObjectClientFactory {
     
     DistributedObjectClient client = ClientFactory.createClient(configHelper, builder, group, connectionComponents, cluster,
         uuid,
-        name);
+        name,
+        this.errorListener);
 
     try {
       client.start();

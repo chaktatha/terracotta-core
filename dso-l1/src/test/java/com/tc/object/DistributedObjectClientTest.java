@@ -28,6 +28,7 @@ import com.tc.management.TCClient;
 import com.tc.net.core.ConnectionInfo;
 import com.tc.net.protocol.tcm.ClientMessageChannel;
 import com.tc.net.protocol.tcm.CommunicationsManager;
+import com.tc.net.protocol.transport.ClientConnectionErrorListener;
 import com.tc.object.config.ClientConfigImpl;
 import com.tc.object.config.ConnectionInfoConfig;
 import com.tc.object.config.PreparedComponentsFromL2Connection;
@@ -120,6 +121,12 @@ public class DistributedObjectClientTest extends TestCase {
   }
   
   public void testFatalError() throws Exception {
+    ClientConnectionErrorListener errorListener = new ClientConnectionErrorListener() {
+      @Override
+      public void onError(ConnectionInfo connInfo, Exception e) {
+
+      }
+    };
     L1ConfigurationSetupManager manager = new L1ConfigurationSetupManager() {
       @Override
       public String[] processArguments() {
@@ -167,7 +174,7 @@ public class DistributedObjectClientTest extends TestCase {
     connectionProperties.put(ConnectionPropertyNames.CONNECTION_TYPE, ProductID.PERMANENT);
     ClientBuilder builder = new StandardClientBuilder(connectionProperties) {
       @Override
-      public ClientMessageChannel createClientMessageChannel(CommunicationsManager commMgr, SessionProvider sessionProvider, int socketConnectTimeout, TCClient client) {
+      public ClientMessageChannel createClientMessageChannel(CommunicationsManager commMgr, SessionProvider sessionProvider, int socketConnectTimeout, TCClient client, ClientConnectionErrorListener errorListener) {
         ClientMessageChannel channel = Mockito.mock(ClientMessageChannel.class);
         try {
           Mockito.when(channel.open(Mockito.anyCollection())).thenThrow(new RuntimeException("bad connection"));
@@ -179,7 +186,7 @@ public class DistributedObjectClientTest extends TestCase {
       }
     };
     
-    DistributedObjectClient client = new DistributedObjectClient(new ClientConfigImpl(manager), builder, threadGroup, l2connection, cluster, null, null);
+    DistributedObjectClient client = new DistributedObjectClient(new ClientConfigImpl(manager), builder, threadGroup, l2connection, cluster, null, null, errorListener);
     client.start();
     Assert.assertTrue(threadGroup.activeCount() > 0);
     long start = System.currentTimeMillis();

@@ -16,7 +16,6 @@ import java.net.InetSocketAddress;
 
 import java.net.URI;
 import java.net.URISyntaxException;
-import java.util.Collection;
 import java.util.Properties;
 
 abstract class AbstractConnectionService implements ConnectionService {
@@ -79,7 +78,7 @@ abstract class AbstractConnectionService implements ConnectionService {
     try {
       client.init();
     } catch (Exception e) {
-      throw new ConnectionException(e);
+      throw new DetailedConnectionException(e, client.getInternalConnectionErrorsPostInit());
     }
     return new TerracottaConnection(client.getClientEntityManager(), endpointConnector, client::shutdown);
   }

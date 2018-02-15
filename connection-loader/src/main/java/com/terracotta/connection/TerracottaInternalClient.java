@@ -20,6 +20,9 @@ package com.terracotta.connection;
 
 import com.tc.config.schema.setup.ConfigurationSetupException;
 import com.tc.object.ClientEntityManager;
+
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.TimeoutException;
 
 
@@ -50,4 +53,6 @@ public interface TerracottaInternalClient {
    * @return The client entity manager for end-points managed by this client.
    */
   ClientEntityManager getClientEntityManager();
+
+  Map<String, List<Exception>> getInternalConnectionErrorsPostInit();
 }

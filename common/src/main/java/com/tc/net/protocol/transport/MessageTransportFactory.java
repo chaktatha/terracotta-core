@@ -25,6 +25,8 @@ import java.util.List;
 public interface MessageTransportFactory {
   ClientConnectionEstablisher createClientConnectionEstablisher();
 
+  ClientConnectionEstablisher createClientConnectionEstablisher(ClientConnectionErrorListener errorListener);
+
   ClientMessageTransport createNewTransport();
 
   ServerMessageTransport createNewTransport(TransportHandshakeErrorHandler handler,

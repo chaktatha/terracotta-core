@@ -34,6 +34,7 @@ import com.tc.net.core.TCConnectionManagerImpl;
 import com.tc.net.core.TCListener;
 import com.tc.net.protocol.NetworkStackHarness;
 import com.tc.net.protocol.NetworkStackHarnessFactory;
+import com.tc.net.protocol.transport.ClientConnectionErrorListener;
 import com.tc.net.protocol.transport.ClientConnectionEstablisher;
 import com.tc.net.protocol.transport.ClientMessageTransport;
 import com.tc.net.protocol.transport.ConnectionHealthChecker;
@@ -45,7 +46,6 @@ import com.tc.net.protocol.transport.DisabledHealthCheckerConfigImpl;
 import com.tc.net.protocol.transport.HealthCheckerConfig;
 import com.tc.net.protocol.transport.MessageTransportFactory;
 import com.tc.net.protocol.transport.MessageTransportListener;
-import com.tc.net.protocol.transport.NullConnectionIDFactoryImpl;
 import com.tc.net.protocol.transport.ReconnectionRejectedHandler;
 import com.tc.net.protocol.transport.ReconnectionRejectedHandlerL1;
 import com.tc.net.protocol.transport.ReconnectionRejectedHandlerL2;
@@ -264,13 +264,20 @@ public class CommunicationsManagerImpl implements CommunicationsManager {
 
   @Override
   public ClientMessageChannel createClientChannel(ProductID productId, SessionProvider sessions, int timeout) {
-    return createClientChannel(productId, sessions, timeout, null, null);
+    return createClientChannel(productId, sessions, timeout, null, null,null);
+  }
+
+  @Override
+  public ClientMessageChannel createClientChannel(ProductID productId, SessionProvider sessions, int timeout,
+                                                  ClientConnectionErrorListener errorListener) {
+    return createClientChannel(productId, sessions, timeout, null, null, errorListener);
   }
   
   public ClientMessageChannel createClientChannel(ProductID productId, SessionProvider sessions, 
                                                   int timeout, 
                                                   MessageTransportFactory transportFactory,
-                                                  TCMessageFactory messageFactory) {
+                                                  TCMessageFactory messageFactory,
+                                                  ClientConnectionErrorListener errorListener) {
 
     final TCMessageFactory msgFactory;
 
@@ -288,7 +295,7 @@ public class CommunicationsManagerImpl implements CommunicationsManager {
       msgFactory = messageFactory;
     }
 
-    ClientMessageChannelImpl rv = new ClientMessageChannelImpl(msgFactory, this.messageRouter, sessions, productId);
+    ClientMessageChannelImpl rv = new ClientMessageChannelImpl(msgFactory, this.messageRouter, sessions, productId, errorListener);
     if (transportFactory == null) transportFactory = new MessageTransportFactoryImpl(transportMessageFactory,
                                                                                      connectionHealthChecker,
                                                                                      connectionManager,
@@ -362,6 +369,11 @@ public class CommunicationsManagerImpl implements CommunicationsManager {
                                  WireProtocolMessageSink wireProtocolMessageSink) throws IOException {
 
     MessageTransportFactory transportFactory = new MessageTransportFactory() {
+      @Override
+      public ClientConnectionEstablisher createClientConnectionEstablisher(ClientConnectionErrorListener errorListener) {
+        throw new AssertionError();
+      }
+
       @Override
       public ClientConnectionEstablisher createClientConnectionEstablisher() {
         throw new AssertionError();

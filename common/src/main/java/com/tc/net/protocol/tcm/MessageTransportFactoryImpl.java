@@ -20,6 +20,7 @@ package com.tc.net.protocol.tcm;
 
 import com.tc.net.core.TCConnection;
 import com.tc.net.core.TCConnectionManager;
+import com.tc.net.protocol.transport.ClientConnectionErrorListener;
 import com.tc.net.protocol.transport.ClientConnectionEstablisher;
 import com.tc.net.protocol.transport.ClientMessageTransport;
 import com.tc.net.protocol.transport.ConnectionHealthChecker;
@@ -71,6 +72,13 @@ public class MessageTransportFactoryImpl implements MessageTransportFactory {
                                                               new WireProtocolAdaptorFactoryImpl(), callbackport);
     cmt.addTransportListener(connectionHealthChecker);
     return cmt;
+  }
+
+  @Override
+  public ClientConnectionEstablisher createClientConnectionEstablisher(ClientConnectionErrorListener errorListener) {
+    ClientConnectionEstablisher clientConnectionEstablisher = new ClientConnectionEstablisher(reconnectionRejectedHandler
+        , errorListener);
+    return clientConnectionEstablisher;
   }
 
   protected ClientMessageTransport createClientMessageTransport(TransportHandshakeErrorHandler handshakeErrorHandler,

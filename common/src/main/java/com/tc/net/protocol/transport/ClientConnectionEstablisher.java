@@ -49,7 +49,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 /**
  * This guy establishes a connection to the server for the Client.
  */
-public class ClientConnectionEstablisher {
+public class ClientConnectionEstablisher implements ClientConnectionErrorListener {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(ClientConnectionEstablisher.class);
 
@@ -63,6 +63,7 @@ public class ClientConnectionEstablisher {
   private volatile AsyncReconnect           asyncReconnect;
 
   private final ReconnectionRejectedHandler reconnectionRejectedHandler;
+  private final ClientConnectionErrorListener errorListener;
 
   static {
     Logger logger = LoggerFactory.getLogger(ClientConnectionEstablisher.class);
@@ -76,9 +77,15 @@ public class ClientConnectionEstablisher {
   }
 
   public ClientConnectionEstablisher(ReconnectionRejectedHandler reconnectionRejectedHandler) {
+    this(reconnectionRejectedHandler, null);
+  }
+
+  public ClientConnectionEstablisher(ReconnectionRejectedHandler reconnectionRejectedHandler
+      , ClientConnectionErrorListener errorListener) {
     this.connAddressProvider = new LinkedHashSet<ConnectionInfo>();
     this.reconnectionRejectedHandler = reconnectionRejectedHandler;
     this.asyncReconnect = new AsyncReconnect(this);
+    this.errorListener = errorListener;
   }
 
   public void reset() {
@@ -145,20 +152,24 @@ public class ClientConnectionEstablisher {
         return cmt.open(info);
       } catch (TransportRedirect redirect) {
         ConnectionInfo add = new ConnectionInfo(redirect.getHostname(), redirect.getPort());
+        onError(info, redirect);
         info = null;
         if (this.connAddressProvider.add(add)) {
           info = add;
         }
       } catch (NoActiveException noactive) {
+        onError(info, noactive);
         info = null;
         LOGGER.debug("Connection attempt failed: ", noactive);
         // if there is no active, throw an IOException and let upper layers of 
         // the network stack handle the issue
         throw new IOException(noactive);
       } catch (TCTimeoutException e) {
+        onError(info, e);
         info = null;
         if (!addresses.hasNext()) { throw e; }
       } catch (IOException e) {
+        onError(info, e);
         info = null;
         if (!addresses.hasNext()) { throw e; }
       }
@@ -607,5 +618,12 @@ public class ClientConnectionEstablisher {
              + ", callback=" + callback + ", timeoutMillis=" + timeoutMillis + ", sa=" + sa + "]";
     }
 
+  }
+
+  @Override
+  public void onError(ConnectionInfo connInfo, Exception e) {
+    if(this.errorListener != null){
+      errorListener.onError(connInfo,e);
+    }
   }
 }

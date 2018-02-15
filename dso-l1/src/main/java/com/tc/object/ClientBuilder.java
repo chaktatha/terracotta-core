@@ -18,6 +18,7 @@
  */
 package com.tc.object;
 
+import com.tc.net.protocol.transport.ClientConnectionErrorListener;
 import org.slf4j.Logger;
 
 import com.tc.async.api.StageManager;
@@ -46,6 +47,11 @@ public interface ClientBuilder {
   ClientMessageChannel createClientMessageChannel(CommunicationsManager commMgr,
                                                      SessionProvider sessionProvider,
                                                      int socketConnectTimeout, TCClient client);
+
+  ClientMessageChannel createClientMessageChannel(CommunicationsManager commMgr,
+                                                  SessionProvider sessionProvider,
+                                                  int socketConnectTimeout, TCClient client,
+                                                  ClientConnectionErrorListener errorListener);
 
   CommunicationsManager createCommunicationsManager(MessageMonitor monitor,
                                                     TCMessageRouter messageRouter,

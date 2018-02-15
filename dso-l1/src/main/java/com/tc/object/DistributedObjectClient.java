@@ -61,6 +61,7 @@ import com.tc.net.protocol.tcm.TCMessage;
 import com.tc.net.protocol.tcm.TCMessageRouter;
 import com.tc.net.protocol.tcm.TCMessageRouterImpl;
 import com.tc.net.protocol.tcm.TCMessageType;
+import com.tc.net.protocol.transport.ClientConnectionErrorListener;
 import com.tc.net.protocol.transport.HealthCheckerConfig;
 import com.tc.net.protocol.transport.HealthCheckerConfigClientImpl;
 import com.tc.net.protocol.transport.NullConnectionPolicy;
@@ -143,7 +144,7 @@ public class DistributedObjectClient implements TCClient {
 
   private Stage<ClusterInternalEventsContext> clusterEventsStage;
 
-  private final String                                 uuid;
+  private final String                               uuid;
   private final String                               name;
 
   private ClientShutdownManager                      shutdownManager;
@@ -157,7 +158,9 @@ public class DistributedObjectClient implements TCClient {
   private ClientEntityManager clientEntityManager;
   private final StageManager communicationStageManager;
 
-  
+  private final ClientConnectionErrorListener clientConnectionErrorListener;
+
+
   public DistributedObjectClient(ClientConfig config, TCThreadGroup threadGroup,
                                  PreparedComponentsFromL2Connection connectionComponents,
                                  ClusterInternal cluster, Properties properties) {
@@ -169,6 +172,14 @@ public class DistributedObjectClient implements TCClient {
                                  PreparedComponentsFromL2Connection connectionComponents,
                                  ClusterInternal cluster,
                                  String uuid, String name) {
+    this(config, builder, threadGroup, connectionComponents, cluster,
+        uuid, name,null);
+  }
+
+  public DistributedObjectClient(ClientConfig config, ClientBuilder builder, TCThreadGroup threadGroup,
+                                 PreparedComponentsFromL2Connection connectionComponents,
+                                 ClusterInternal cluster,
+                                 String uuid, String name, ClientConnectionErrorListener errorListener) {
     Assert.assertNotNull(config);
     this.config = config;
     this.connectionComponents = connectionComponents;
@@ -183,6 +194,7 @@ public class DistributedObjectClient implements TCClient {
     // We need a StageManager to create the SEDA stages used for handling the messages.
     final SEDA<Void> seda = new SEDA<Void>(threadGroup);
     communicationStageManager = seda.getStageManager();
+    this.clientConnectionErrorListener = errorListener;
   }
 
   private ReconnectConfig getReconnectPropertiesFromServer() {
@@ -279,7 +291,7 @@ public class DistributedObjectClient implements TCClient {
     if (socketConnectTimeout < 0) { throw new IllegalArgumentException("invalid socket time value: "
                                                                        + socketConnectTimeout); }
     this.channel = this.clientBuilder.createClientMessageChannel(this.communicationsManager,
-                                                                 sessionManager, socketConnectTimeout, this);
+                                                                 sessionManager, socketConnectTimeout, this, this.clientConnectionErrorListener);
     // add this listener so that the whole system is shutdown
     // if the transport is closed from underneath.
     //  this typically happens when the transport is disconnected and 

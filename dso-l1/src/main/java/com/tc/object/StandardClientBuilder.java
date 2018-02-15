@@ -18,6 +18,7 @@
  */
 package com.tc.object;
 
+import com.tc.net.protocol.transport.*;
 import org.slf4j.Logger;
 import org.terracotta.connection.ConnectionPropertyNames;
 
@@ -34,10 +35,6 @@ import com.tc.net.protocol.tcm.MessageMonitor;
 import com.tc.net.protocol.tcm.TCMessage;
 import com.tc.net.protocol.tcm.TCMessageRouter;
 import com.tc.net.protocol.tcm.TCMessageType;
-import com.tc.net.protocol.transport.ConnectionPolicy;
-import com.tc.net.protocol.transport.HealthCheckerConfig;
-import com.tc.net.protocol.transport.ReconnectionRejectedHandler;
-import com.tc.net.protocol.transport.TransportHandshakeErrorHandlerForL1;
 import com.tc.object.handshakemanager.ClientHandshakeManager;
 import com.tc.object.handshakemanager.ClientHandshakeManagerImpl;
 import com.tc.object.msg.ClientHandshakeMessageFactory;
@@ -62,6 +59,11 @@ public class StandardClientBuilder implements ClientBuilder {
                                                          SessionProvider sessionProvider, 
                                                          int socketConnectTimeout, TCClient client) {
     return commMgr.createClientChannel(typeOfClient, sessionProvider, socketConnectTimeout);
+  }
+
+  @Override
+  public ClientMessageChannel createClientMessageChannel(CommunicationsManager commMgr, SessionProvider sessionProvider, int socketConnectTimeout, TCClient client, ClientConnectionErrorListener errorListener) {
+    return commMgr.createClientChannel(typeOfClient, sessionProvider, socketConnectTimeout, errorListener);
   }
 
   @Override

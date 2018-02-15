@@ -19,12 +19,16 @@
 package com.terracotta.connection;
 
 import com.tc.config.schema.setup.ConfigurationSetupException;
+import com.tc.net.protocol.transport.ClientConnectionErrorListener;
 import com.tc.object.ClientBuilderFactory;
 import com.tc.object.ClientEntityManager;
 import com.tc.object.DistributedObjectClient;
 import com.tc.object.DistributedObjectClientFactory;
+import com.tc.net.protocol.transport.ClientConnectionErrorDetails;
 import com.terracotta.connection.client.TerracottaClientStripeConnectionConfig;
 
+import java.util.List;
+import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.TimeoutException;
 
@@ -34,6 +38,7 @@ public class TerracottaInternalClientImpl implements TerracottaInternalClient {
     private static final long serialVersionUID = 1L;
   }
 
+  private final ClientConnectionErrorDetails errorListener;
   private final DistributedObjectClientFactory clientCreator;
   private volatile ClientHandle       clientHandle;
   private volatile boolean            shutdown             = false;
@@ -41,16 +46,17 @@ public class TerracottaInternalClientImpl implements TerracottaInternalClient {
 
   TerracottaInternalClientImpl(TerracottaClientStripeConnectionConfig stripeConnectionConfig, Properties props) {
     try {
-      this.clientCreator = buildClientCreator(stripeConnectionConfig, props);
+      this.errorListener = new ClientConnectionErrorDetails();
+      this.clientCreator = buildClientCreator(stripeConnectionConfig, props, this.errorListener);
     } catch (Exception e) {
       throw new RuntimeException(e);
     }
   }
   
-  private DistributedObjectClientFactory buildClientCreator(TerracottaClientStripeConnectionConfig stripeConnectionConfig, Properties props) {
+  private DistributedObjectClientFactory buildClientCreator(TerracottaClientStripeConnectionConfig stripeConnectionConfig, Properties props, ClientConnectionErrorListener errorListener) {
     return new DistributedObjectClientFactory(stripeConnectionConfig.getStripeMemberUris(),
                                               ClientBuilderFactory.get().create(props),
-                                              props);
+                                              props, errorListener);
   }
 
   @Override
@@ -91,5 +97,10 @@ public class TerracottaInternalClientImpl implements TerracottaInternalClient {
   @Override
   public ClientEntityManager getClientEntityManager() {
     return clientHandle.getClientEntityManager();
+  }
+
+  @Override
+  public Map<String, List<Exception>> getInternalConnectionErrorsPostInit() {
+    return errorListener.getErrors();
   }
 }
