@@ -73,14 +73,7 @@ public class MessageTransportFactoryImpl implements MessageTransportFactory {
     cmt.addTransportListener(connectionHealthChecker);
     return cmt;
   }
-
-  @Override
-  public ClientConnectionEstablisher createClientConnectionEstablisher(ClientConnectionErrorListener errorListener) {
-    ClientConnectionEstablisher clientConnectionEstablisher = new ClientConnectionEstablisher(reconnectionRejectedHandler
-        , errorListener);
-    return clientConnectionEstablisher;
-  }
-
+  
   protected ClientMessageTransport createClientMessageTransport(TransportHandshakeErrorHandler handshakeErrorHandler,
                                                                 TransportHandshakeMessageFactory messageFactory,
                                                                 WireProtocolAdaptorFactory wireProtocolAdaptorFactory,

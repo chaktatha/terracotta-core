@@ -77,8 +77,8 @@ public class ClientNetworkStackHarness extends LayeredNetworkStackHarness {
     }
   }
   
-  protected ClientConnectionEstablisher createClientConnectionEstablisher(ClientMessageChannel clientMessaheChannel) {
-    return transportFactory.createClientConnectionEstablisher(clientMessaheChannel.getClientConnectionErrorListener());
+  protected ClientConnectionEstablisher createClientConnectionEstablisher() {
+    return transportFactory.createClientConnectionEstablisher();
   }
 
   protected void connectStack() {

@@ -44,6 +44,8 @@ import java.io.IOException;
 import java.lang.management.ManagementFactory;
 import java.net.UnknownHostException;
 import java.util.Collection;
+import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 
 public class ClientMessageChannelImpl extends AbstractMessageChannel implements ClientMessageChannel, ClientHandshakeMessageFactory {
@@ -55,14 +57,12 @@ public class ClientMessageChannelImpl extends AbstractMessageChannel implements 
   private final SessionProvider           sessionProvider;
   private MessageTransportInitiator       initiator;
   private volatile SessionID              channelSessionID = SessionID.NULL_ID;
-  private final ClientConnectionErrorListener errorListener;
+  private final List<ClientConnectionErrorListener> errorListener = new CopyOnWriteArrayList<>();
 
   protected ClientMessageChannelImpl(TCMessageFactory msgFactory, TCMessageRouter router,
-                                     SessionProvider sessionProvider, ProductID productId,
-                                     ClientConnectionErrorListener errorListener) {
+                                     SessionProvider sessionProvider, ProductID productId) {
     super(router, logger, msgFactory, StripeID.NULL_ID, productId);
     this.sessionProvider = sessionProvider;
-    this.errorListener = errorListener;
     this.sessionProvider.initProvider();
   }
 
@@ -196,7 +196,15 @@ public class ClientMessageChannelImpl extends AbstractMessageChannel implements 
   }
 
   @Override
-  public ClientConnectionErrorListener getClientConnectionErrorListener() {
-    return this.errorListener;
+  public void onError(ConnectionInfo connInfo, Exception e) {
+    errorListener.forEach(l->l.onError(connInfo, e));
+  }
+
+  public void addClientConnectionErrorListener(ClientConnectionErrorListener l) {
+    errorListener.add(l);
+  }
+  
+  public void removeClientConnectionErrorListener(ClientConnectionErrorListener l) {
+    errorListener.remove(l);
   }
 }

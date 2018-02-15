@@ -25,6 +25,7 @@ import com.tc.object.ClientEntityManager;
 import com.tc.object.DistributedObjectClient;
 import com.tc.object.DistributedObjectClientFactory;
 import com.tc.net.protocol.transport.ClientConnectionErrorDetails;
+import com.tc.object.ClientBuilder;
 import com.terracotta.connection.client.TerracottaClientStripeConnectionConfig;
 
 import java.util.List;
@@ -54,9 +55,11 @@ public class TerracottaInternalClientImpl implements TerracottaInternalClient {
   }
   
   private DistributedObjectClientFactory buildClientCreator(TerracottaClientStripeConnectionConfig stripeConnectionConfig, Properties props, ClientConnectionErrorListener errorListener) {
+    ClientBuilder builder = ClientBuilderFactory.get().create(props);
+    builder.setClientConnectionErrorListener(errorListener);
     return new DistributedObjectClientFactory(stripeConnectionConfig.getStripeMemberUris(),
-                                              ClientBuilderFactory.get().create(props),
-                                              props, errorListener);
+                                              builder,
+                                              props);
   }
 
   @Override

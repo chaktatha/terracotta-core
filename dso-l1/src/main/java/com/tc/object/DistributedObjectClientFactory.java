@@ -46,14 +46,12 @@ public class DistributedObjectClientFactory {
   private final List<InetSocketAddress> stripeMemberUris;
   private final ClientBuilder builder;
   private final Properties        properties;
-  private final ClientConnectionErrorListener errorListener;
 
   public DistributedObjectClientFactory(List<InetSocketAddress> stripeMemberUris, ClientBuilder builder,
-                                        Properties properties, ClientConnectionErrorListener errorListener) {
+                                        Properties properties) {
     this.stripeMemberUris = stripeMemberUris;
     this.builder = builder;
     this.properties = properties;
-    this.errorListener = errorListener;
   }
 
   public DistributedObjectClient create() throws InterruptedException, ConfigurationSetupException {
@@ -92,8 +90,7 @@ public class DistributedObjectClientFactory {
     
     DistributedObjectClient client = ClientFactory.createClient(configHelper, builder, group, connectionComponents, cluster,
         uuid,
-        name,
-        this.errorListener);
+        name);
 
     try {
       client.start();

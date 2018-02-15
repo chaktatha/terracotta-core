@@ -49,6 +49,7 @@ import java.util.Properties;
 public class StandardClientBuilder implements ClientBuilder {
   
   private final ProductID typeOfClient;
+  private ClientConnectionErrorListener listener;
 
   public StandardClientBuilder(Properties connectionProperties) {
     this.typeOfClient = getTypeOfClient(connectionProperties);
@@ -58,12 +59,11 @@ public class StandardClientBuilder implements ClientBuilder {
   public ClientMessageChannel createClientMessageChannel(CommunicationsManager commMgr,
                                                          SessionProvider sessionProvider, 
                                                          int socketConnectTimeout, TCClient client) {
-    return commMgr.createClientChannel(typeOfClient, sessionProvider, socketConnectTimeout);
-  }
-
-  @Override
-  public ClientMessageChannel createClientMessageChannel(CommunicationsManager commMgr, SessionProvider sessionProvider, int socketConnectTimeout, TCClient client, ClientConnectionErrorListener errorListener) {
-    return commMgr.createClientChannel(typeOfClient, sessionProvider, socketConnectTimeout, errorListener);
+    ClientMessageChannel cmc = commMgr.createClientChannel(typeOfClient, sessionProvider, socketConnectTimeout);
+    if (listener != null) {
+      cmc.addClientConnectionErrorListener(listener);
+    }
+    return cmc;
   }
 
   @Override
@@ -114,5 +114,10 @@ public class StandardClientBuilder implements ClientBuilder {
 
   protected BufferManagerFactory getBufferManagerFactory() {
     return new ClearTextBufferManagerFactory();
+  }
+
+  @Override
+  public void setClientConnectionErrorListener(ClientConnectionErrorListener listener) {
+    this.listener = listener;
   }
 }

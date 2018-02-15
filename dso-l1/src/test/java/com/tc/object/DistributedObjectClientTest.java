@@ -174,7 +174,7 @@ public class DistributedObjectClientTest extends TestCase {
     connectionProperties.put(ConnectionPropertyNames.CONNECTION_TYPE, ProductID.PERMANENT);
     ClientBuilder builder = new StandardClientBuilder(connectionProperties) {
       @Override
-      public ClientMessageChannel createClientMessageChannel(CommunicationsManager commMgr, SessionProvider sessionProvider, int socketConnectTimeout, TCClient client, ClientConnectionErrorListener errorListener) {
+      public ClientMessageChannel createClientMessageChannel(CommunicationsManager commMgr, SessionProvider sessionProvider, int socketConnectTimeout, TCClient client) {
         ClientMessageChannel channel = Mockito.mock(ClientMessageChannel.class);
         try {
           Mockito.when(channel.open(Mockito.anyCollection())).thenThrow(new RuntimeException("bad connection"));
@@ -186,7 +186,7 @@ public class DistributedObjectClientTest extends TestCase {
       }
     };
     
-    DistributedObjectClient client = new DistributedObjectClient(new ClientConfigImpl(manager), builder, threadGroup, l2connection, cluster, null, null, errorListener);
+    DistributedObjectClient client = new DistributedObjectClient(new ClientConfigImpl(manager), builder, threadGroup, l2connection, cluster, null, null);
     client.start();
     Assert.assertTrue(threadGroup.activeCount() > 0);
     long start = System.currentTimeMillis();

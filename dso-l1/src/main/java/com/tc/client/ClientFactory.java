@@ -38,13 +38,4 @@ public class ClientFactory {
         cluster,
         uuid, name);
   }
-
-  public static DistributedObjectClient createClient(ClientConfig config, ClientBuilder builder, TCThreadGroup threadGroup,
-                                                     PreparedComponentsFromL2Connection connectionComponents,
-                                                     ClusterInternal cluster,
-                                                     String uuid, String name, ClientConnectionErrorListener errorListener) {
-    return new DistributedObjectClient(config, builder, threadGroup, connectionComponents,
-        cluster,
-        uuid, name, errorListener);
-  }
 }

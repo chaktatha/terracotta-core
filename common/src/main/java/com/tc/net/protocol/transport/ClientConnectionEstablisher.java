@@ -49,7 +49,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 /**
  * This guy establishes a connection to the server for the Client.
  */
-public class ClientConnectionEstablisher implements ClientConnectionErrorListener {
+public class ClientConnectionEstablisher {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(ClientConnectionEstablisher.class);
 
@@ -63,7 +63,6 @@ public class ClientConnectionEstablisher implements ClientConnectionErrorListene
   private volatile AsyncReconnect           asyncReconnect;
 
   private final ReconnectionRejectedHandler reconnectionRejectedHandler;
-  private final ClientConnectionErrorListener errorListener;
 
   static {
     Logger logger = LoggerFactory.getLogger(ClientConnectionEstablisher.class);
@@ -77,15 +76,9 @@ public class ClientConnectionEstablisher implements ClientConnectionErrorListene
   }
 
   public ClientConnectionEstablisher(ReconnectionRejectedHandler reconnectionRejectedHandler) {
-    this(reconnectionRejectedHandler, null);
-  }
-
-  public ClientConnectionEstablisher(ReconnectionRejectedHandler reconnectionRejectedHandler
-      , ClientConnectionErrorListener errorListener) {
     this.connAddressProvider = new LinkedHashSet<ConnectionInfo>();
     this.reconnectionRejectedHandler = reconnectionRejectedHandler;
     this.asyncReconnect = new AsyncReconnect(this);
-    this.errorListener = errorListener;
   }
 
   public void reset() {
@@ -126,19 +119,22 @@ public class ClientConnectionEstablisher implements ClientConnectionErrorListene
    * @throws CommStackMismatchException
    * @throws MaxConnectionsExceededException
    */
-  public NetworkStackID open(Collection<ConnectionInfo> info, ClientMessageTransport cmt) throws TCTimeoutException, IOException, MaxConnectionsExceededException,
+  public NetworkStackID open(Collection<ConnectionInfo> info, ClientMessageTransport cmt, ClientConnectionErrorListener reporter) throws TCTimeoutException, IOException, MaxConnectionsExceededException,
       CommStackMismatchException {
+    Assert.assertNotNull(cmt);
+    Assert.assertNotNull(reporter);
+    Assert.assertNotNull(info);
     synchronized (this.asyncReconnecting) {
       if (info != null) {
         connAddressProvider.addAll(info);
       }
       Assert.eval("Can't call open() while asynch reconnect occurring", !this.asyncReconnecting.get());
       this.allowReconnects.set(true);
-      return connectTryAllOnce(cmt);
+      return connectTryAllOnce(cmt, reporter);
     }
   }
 
-  NetworkStackID connectTryAllOnce(ClientMessageTransport cmt) throws TCTimeoutException, IOException,
+  NetworkStackID connectTryAllOnce(ClientMessageTransport cmt, ClientConnectionErrorListener reporter) throws TCTimeoutException, IOException,
       MaxConnectionsExceededException, CommStackMismatchException {
     final Iterator<ConnectionInfo> addresses = new ArrayList<ConnectionInfo>(this.connAddressProvider).iterator();
     Assert.assertFalse(cmt.isConnected());
@@ -152,24 +148,24 @@ public class ClientConnectionEstablisher implements ClientConnectionErrorListene
         return cmt.open(info);
       } catch (TransportRedirect redirect) {
         ConnectionInfo add = new ConnectionInfo(redirect.getHostname(), redirect.getPort());
-        onError(info, redirect);
+        reporter.onError(info, redirect);
         info = null;
         if (this.connAddressProvider.add(add)) {
           info = add;
         }
       } catch (NoActiveException noactive) {
-        onError(info, noactive);
+        reporter.onError(info, noactive);
         info = null;
         LOGGER.debug("Connection attempt failed: ", noactive);
         // if there is no active, throw an IOException and let upper layers of 
         // the network stack handle the issue
         throw new IOException(noactive);
       } catch (TCTimeoutException e) {
-        onError(info, e);
+        reporter.onError(info, e);
         info = null;
         if (!addresses.hasNext()) { throw e; }
       } catch (IOException e) {
-        onError(info, e);
+        reporter.onError(info, e);
         info = null;
         if (!addresses.hasNext()) { throw e; }
       }
@@ -618,12 +614,5 @@ public class ClientConnectionEstablisher implements ClientConnectionErrorListene
              + ", callback=" + callback + ", timeoutMillis=" + timeoutMillis + ", sa=" + sa + "]";
     }
 
-  }
-
-  @Override
-  public void onError(ConnectionInfo connInfo, Exception e) {
-    if(this.errorListener != null){
-      errorListener.onError(connInfo,e);
-    }
   }
 }

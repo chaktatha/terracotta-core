@@ -26,7 +26,7 @@ import com.tc.object.ClientIDProvider;
 import com.tc.object.msg.ClientHandshakeMessageFactory;
 
 
-public interface ClientMessageChannel extends MessageChannel, NetworkLayer, MessageTransportListener, ClientIDProvider {
+public interface ClientMessageChannel extends MessageChannel, NetworkLayer, MessageTransportListener, ClientIDProvider, ClientConnectionErrorListener {
 
   public int getConnectCount();
 
@@ -35,6 +35,8 @@ public interface ClientMessageChannel extends MessageChannel, NetworkLayer, Mess
   public ClientHandshakeMessageFactory getClientHandshakeMessageFactory();
 
   public void setMessageTransportInitiator(MessageTransportInitiator initiator);
-
-  public ClientConnectionErrorListener getClientConnectionErrorListener();
+  
+  public void addClientConnectionErrorListener(ClientConnectionErrorListener l);
+  
+  public void removeClientConnectionErrorListener(ClientConnectionErrorListener l);
 }
