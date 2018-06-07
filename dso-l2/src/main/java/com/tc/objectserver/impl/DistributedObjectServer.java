@@ -21,6 +21,7 @@ package com.tc.objectserver.impl;
 import com.tc.async.api.AbstractEventHandler;
 import com.tc.async.api.EventHandlerException;
 
+import com.tc.config.schema.setup.L2DynamicConfigurationSetupManager;
 import com.tc.logging.TCLogging;
 import com.tc.net.core.BufferManagerFactory;
 import com.tc.net.core.ClearTextBufferManagerFactory;
@@ -246,6 +247,7 @@ public class DistributedObjectServer implements TCDumper, ServerConnectionValida
   private final TCServer                         server;
   private final ServerBuilder                    serverBuilder;
   protected final L2ConfigurationSetupManager    configSetupManager;
+  protected final L2DynamicConfigurationSetupManager    dynamicConfigurationSetupManager;
   protected final HaConfigImpl                   haConfig;
 
   private static final Logger logger = LoggerFactory.getLogger(DistributedObjectServer.class);
@@ -280,13 +282,14 @@ public class DistributedObjectServer implements TCDumper, ServerConnectionValida
   private EntityManagerImpl entityManager;
 
   // used by a test
-  public DistributedObjectServer(L2ConfigurationSetupManager configSetupManager, TCThreadGroup threadGroup,
-                                 ConnectionPolicy connectionPolicy, TCServerInfoMBean tcServerInfoMBean) {
-    this(configSetupManager, threadGroup, connectionPolicy, new SEDA<HttpConnectionContext>(threadGroup), null);
+  public DistributedObjectServer(L2ConfigurationSetupManager configSetupManager, L2DynamicConfigurationSetupManager dynamicConfigurationSetupManager,
+                                 TCThreadGroup threadGroup, ConnectionPolicy connectionPolicy, TCServerInfoMBean tcServerInfoMBean) {
+    this(configSetupManager, dynamicConfigurationSetupManager, threadGroup, connectionPolicy, new SEDA<HttpConnectionContext>(threadGroup), null);
 
   }
 
-  public DistributedObjectServer(L2ConfigurationSetupManager configSetupManager, TCThreadGroup threadGroup,
+  public DistributedObjectServer(L2ConfigurationSetupManager configSetupManager, L2DynamicConfigurationSetupManager dynamicConfigurationSetupManager,
+                                 TCThreadGroup threadGroup,
                                  ConnectionPolicy connectionPolicy,
                                  SEDA<HttpConnectionContext> seda,
                                  TCServer server) {
@@ -296,6 +299,7 @@ public class DistributedObjectServer implements TCDumper, ServerConnectionValida
     Assert.assertEquals(threadGroup, Thread.currentThread().getThreadGroup());
 
     this.configSetupManager = configSetupManager;
+    this.dynamicConfigurationSetupManager = dynamicConfigurationSetupManager;
     this.haConfig = new HaConfigImpl(this.configSetupManager);
     this.connectionPolicy = connectionPolicy;
     this.threadGroup = threadGroup;
@@ -315,7 +319,7 @@ public class DistributedObjectServer implements TCDumper, ServerConnectionValida
   protected ServerBuilder getServerBuilder() {
     return this.serverBuilder;
   }
-  
+
   public byte[] getClusterState(Charset set) {
     PrettyPrinter pp = null;
     try {
@@ -369,7 +373,7 @@ public class DistributedObjectServer implements TCDumper, ServerConnectionValida
       t.printStackTrace(p);
       p.close();
       prettyPrinter.println(w.toString());
-    }  
+    }
   }
 
   public synchronized void start() throws IOException, LocationNotCreatedException, FileNotCreatedException {
@@ -421,7 +425,7 @@ public class DistributedObjectServer implements TCDumper, ServerConnectionValida
 
     this.tcProperties = TCPropertiesImpl.getProperties();
     this.l1ReconnectConfig = new L1ReconnectConfigImpl();
-    
+
     final int maxStageSize = tcProperties.getInt(TCPropertiesConsts.L2_SEDA_STAGE_SINK_CAPACITY);
     final StageManager stageManager = this.seda.getStageManager();
 
@@ -430,15 +434,15 @@ public class DistributedObjectServer implements TCDumper, ServerConnectionValida
 
     // Set up the ServiceRegistry.
     TcConfiguration base = this.configSetupManager.commonl2Config().getTCConfiguration();
-    PlatformConfiguration platformConfiguration = new PlatformConfigurationImpl(this.configSetupManager.dsoL2Config(), base);
+    PlatformConfiguration platformConfiguration = new PlatformConfigurationImpl(this.configSetupManager.dsoL2Config(), base, this.dynamicConfigurationSetupManager.getConfigurationRepository());
     serviceRegistry.initialize(platformConfiguration, base, Thread.currentThread().getContextClassLoader());
     serviceRegistry.registerImplementationProvided(new PlatformServiceProvider(this));
 
     final EntityMessengerProvider messengerProvider = new EntityMessengerProvider();
     this.serviceRegistry.registerImplementationProvided(messengerProvider);
-    
 
-    
+
+
     // See if we need to add an in-memory service for IPlatformPersistence.
     if (!this.serviceRegistry.hasUserProvidedServiceProvider(IPlatformPersistence.class)) {
       // In this case, we do still need to provide an implementation of IPlatformPersistence, backed by memory, so that entities can request a service which is as persistent as this server is.
@@ -446,7 +450,7 @@ public class DistributedObjectServer implements TCDumper, ServerConnectionValida
       nullPlatformStorageServiceProvider.initialize(new NullPlatformStorageProviderConfiguration(), platformConfiguration);
       serviceRegistry.registerExternal(nullPlatformStorageServiceProvider);
     }
-    
+
     // We want to register our IMonitoringProducer shim.
     // (note that it requires a PlatformServer instance of THIS server).
     String hostAddress = "";
@@ -458,18 +462,18 @@ public class DistributedObjectServer implements TCDumper, ServerConnectionValida
     final int serverPort = l2DSOConfig.tsaPort().getValue();
     final ProductInfo pInfo = ProductInfo.getInstance();
     PlatformServer thisServer = new PlatformServer(server.getL2Identifier(), host, hostAddress, bindAddress, serverPort, l2DSOConfig.tsaGroupPort().getValue(), pInfo.buildVersion(), pInfo.buildID(), TCServerMain.getServer().getStartTime());
-    
+
     final LocalMonitoringProducer monitoringShimService = new LocalMonitoringProducer(this.serviceRegistry, thisServer, this.timer);
     this.serviceRegistry.registerImplementationProvided(monitoringShimService);
-    
+
     // ***** NOTE:  At this point, since we are about to create a subregistry for the platform, the serviceRegistry must be complete!
-    
+
     // The platform gets the reserved consumerID 0.
     long platformConsumerID = 0;
     InternalServiceRegistry platformServiceRegistry = serviceRegistry.subRegistry(platformConsumerID);
-    
+
     Set<ProductID> capablities = EnumSet.allOf(ProductID.class);
-    
+
     if (serviceRegistry.hasUserProvidedServiceProvider(ProductCapabilities.class)) {
       try {
         capablities = platformServiceRegistry.getService(new BasicServiceConfiguration<>(ProductCapabilities.class)).supportedClients();
@@ -524,7 +528,7 @@ public class DistributedObjectServer implements TCDumper, ServerConnectionValida
     final TCMessageRouter messageRouter = new TCMessageRouterImpl();
 
     BufferManagerFactory bufferManagerFactory = getBufferManagerFactory(platformServiceRegistry);
-    
+
     this.communicationsManager = new CommunicationsManagerImpl(CommunicationsManager.COMMSMGR_SERVER, mm,
                                                                messageRouter, networkStackHarnessFactory,
                                                                this.connectionPolicy, commWorkerThreadCount,
@@ -553,14 +557,14 @@ public class DistributedObjectServer implements TCDumper, ServerConnectionValida
     }
 
     ConsistencyManager consistencyMgr = (voteCount < 0 || knownPeers == 0) ? (a, b, c)->true : new ConsistencyManagerImpl(knownPeers, voteCount);
-    
+
     final String dsoBind = l2DSOConfig.tsaPort().getBind();
     this.l1Listener = this.communicationsManager.createListener(new TCSocketAddress(dsoBind, serverPort), true,
                                                                 this.connectionIdFactory, (t)->{
-                                                                  return t.getConnectionId().getProductId().isInternal() || consistencyMgr.requestTransition(context.getL2Coordinator().getStateManager().getCurrentMode(), 
+                                                                  return t.getConnectionId().getProductId().isInternal() || consistencyMgr.requestTransition(context.getL2Coordinator().getStateManager().getCurrentMode(),
                                                                       t.getConnectionId().getClientID(), ConsistencyManager.Transition.ADD_CLIENT);
                                                                 });
-    
+
     this.l1Diagnostics = this.communicationsManager.createListener(new TCSocketAddress(dsoBind, serverPort), true, infoConnections, () -> {
       StateManager stateMgr = l2Coordinator.getStateManager();
       // only provide an active name if this server is not active
@@ -570,7 +574,7 @@ public class DistributedObjectServer implements TCDumper, ServerConnectionValida
       }
       return null;
     });
-    
+
     this.stripeIDStateManager = new StripeIDStateManagerImpl(this.persistor.getClusterStatePersistor());
 
     final DSOChannelManager channelManager = new DSOChannelManagerImpl(this.l1Listener.getChannelManager(),
@@ -604,7 +608,7 @@ public class DistributedObjectServer implements TCDumper, ServerConnectionValida
     weightGeneratorFactory.add(randomWeightGenerator);
     // -We can now install the generator as it is built.
     this.globalWeightGeneratorFactory = weightGeneratorFactory;
-    
+
 
     final ChannelStatsImpl channelStats = new ChannelStatsImpl(sampledCounterManager, channelManager);
     channelManager.addEventListener(channelStats);
@@ -654,7 +658,7 @@ public class DistributedObjectServer implements TCDumper, ServerConnectionValida
       logger.info("disabling the use for direct sinks");
     }
     RequestProcessor processor = new RequestProcessor(stageManager, USE_DIRECT);
-    
+
     ManagementTopologyEventCollector eventCollector = new ManagementTopologyEventCollector(serviceInterface);
     ClientEntityStateManager clientEntityStateManager = new ClientEntityStateManagerImpl();
 
@@ -671,58 +675,58 @@ public class DistributedObjectServer implements TCDumper, ServerConnectionValida
 
     VoltronMessageHandler voltron = new VoltronMessageHandler(channelManager, USE_DIRECT);
     // We need to connect the IInterEntityMessengerProvider to the voltronMessageSink.
-    
+
     Stage<VoltronEntityMessage> fast = stageManager.createStage(ServerConfigurationContext.SINGLE_THREADED_FAST_PATH, VoltronEntityMessage.class, voltron, 1, maxStageSize);
     messengerProvider.setMessageSink(fast.getSink());
-    entityManager.setMessageSink(fast.getSink());    
+    entityManager.setMessageSink(fast.getSink());
     // If we are running in a restartable mode, instantiate any entities in storage.
     processTransactionHandler.loadExistingEntities();
-            
+
     this.groupCommManager = this.serverBuilder.createGroupCommManager(this.configSetupManager, stageManager,
                                                                       this.thisServerNodeID,
                                                                       this.stripeIDStateManager, this.globalWeightGeneratorFactory,
                                                                       bufferManagerFactory);
-        
+
     if (consistencyMgr instanceof GroupEventsListener) {
       this.groupCommManager.registerForGroupEvents((GroupEventsListener)consistencyMgr);
     }
-    
+
     final Stage<ClientHandshakeMessage> clientHandshake = stageManager.createStage(ServerConfigurationContext.CLIENT_HANDSHAKE_STAGE, ClientHandshakeMessage.class, createHandShakeHandler(entityManager, processTransactionHandler, consistencyMgr), 1, maxStageSize);
-    
+
     Stage<HydrateContext> hydrator = stageManager.createStage(ServerConfigurationContext.HYDRATE_MESSAGE_STAGE, HydrateContext.class, new HydrateHandler(), L2Utils.getOptimalCommWorkerThreads(), maxStageSize);
-    
+
     messageRouter.routeMessageType(TCMessageType.CLIENT_HANDSHAKE_MESSAGE, new TCMessageHydrateSink<>(clientHandshake.getSink()));
     messageRouter.routeMessageType(TCMessageType.VOLTRON_ENTITY_MESSAGE, new VoltronMessageSink(hydrator, fast.getSink(), entityManager));
-    messageRouter.routeMessageType(TCMessageType.DIAGNOSTIC_REQUEST, new DiagnosticsHandler(this));    
+    messageRouter.routeMessageType(TCMessageType.DIAGNOSTIC_REQUEST, new DiagnosticsHandler(this));
 
     HASettingsChecker haChecker = new HASettingsChecker(configSetupManager, tcProperties);
     haChecker.validateHealthCheckSettingsForHighAvailability();
 
     L2StateChangeHandler stateHandler = new L2StateChangeHandler(createStageController(monitoringShimService), eventCollector);
     final Stage<StateChangedEvent> stateChange = stageManager.createStage(ServerConfigurationContext.L2_STATE_CHANGE_STAGE, StateChangedEvent.class, stateHandler, 1, maxStageSize);
-    StateManager state = new StateManagerImpl(DistributedObjectServer.consoleLogger, this.groupCommManager, 
-        stateChange.getSink(), stageManager, 
+    StateManager state = new StateManagerImpl(DistributedObjectServer.consoleLogger, this.groupCommManager,
+        stateChange.getSink(), stageManager,
         configSetupManager.getActiveServerGroupForThisL2().getMembers().length,
         configSetupManager.getActiveServerGroupForThisL2().getElectionTimeInSecs(),
-        weightGeneratorFactory, consistencyMgr, 
+        weightGeneratorFactory, consistencyMgr,
         this.persistor.getClusterStatePersistor());
-    
+
     state.registerForStateChangeEvents(this.server);
     // And the stage for handling their response batching/serialization.
-    Stage<Runnable> replicationResponseStage = stageManager.createStage(ServerConfigurationContext.PASSIVE_OUTGOING_RESPONSE_STAGE, Runnable.class, 
+    Stage<Runnable> replicationResponseStage = stageManager.createStage(ServerConfigurationContext.PASSIVE_OUTGOING_RESPONSE_STAGE, Runnable.class,
         new GenericHandler<>(), 1, maxStageSize);
-//  routing for passive to receive replication    
+//  routing for passive to receive replication
     ReplicatedTransactionHandler replicatedTransactionHandler = new ReplicatedTransactionHandler(state, replicationResponseStage, this.persistor, entityManager, groupCommManager);
     // This requires both the stage for handling the replication/sync messages.
-    Stage<ReplicationMessage> replicationStage = stageManager.createStage(ServerConfigurationContext.PASSIVE_REPLICATION_STAGE, ReplicationMessage.class, 
+    Stage<ReplicationMessage> replicationStage = stageManager.createStage(ServerConfigurationContext.PASSIVE_REPLICATION_STAGE, ReplicationMessage.class,
         replicatedTransactionHandler.getEventHandler(), 1, maxStageSize);
-    
+
     final ChannelLifeCycleHandler channelLifeCycleHandler = new ChannelLifeCycleHandler(this.communicationsManager,
                                                                                         stageManager, channelManager,
                                                                                         clientEntityStateManager, processTransactionHandler, eventCollector);
     channelManager.addEventListener(channelLifeCycleHandler);
-    
-    this.l2Coordinator = this.serverBuilder.createL2HACoordinator(consoleLogger, this, 
+
+    this.l2Coordinator = this.serverBuilder.createL2HACoordinator(consoleLogger, this,
                                                                   stageManager, state,
                                                                   this.groupCommManager,
                                                                   this.persistor,
@@ -732,14 +736,14 @@ public class DistributedObjectServer implements TCDumper, ServerConnectionValida
                                                                   channelLifeCycleHandler);
 
     connectServerStateToReplicatedState(processTransactionHandler, state, clientEntityStateManager, l2Coordinator.getReplicatedClusterStateManager());
-// setup replication    
+// setup replication
     final Stage<Runnable> replicationSenderStage = stageManager.createStage(ServerConfigurationContext.ACTIVE_TO_PASSIVE_DRIVER_STAGE, Runnable.class, new GenericHandler<>(), 1, maxStageSize);
     ReplicationSender replicationSender = new ReplicationSender(replicationSenderStage, groupCommManager);
-    
-    final ActiveToPassiveReplication passives = new ActiveToPassiveReplication(consistencyMgr, processTransactionHandler, l2Coordinator.getReplicatedClusterStateManager().getPassives(), this.persistor.getEntityPersistor(), replicationSender, this.getGroupManager());
-    processor.setReplication(passives); 
 
-    Stage<ReplicationMessageAck> replicationStageAck = stageManager.createStage(ServerConfigurationContext.PASSIVE_REPLICATION_ACK_STAGE, ReplicationMessageAck.class, 
+    final ActiveToPassiveReplication passives = new ActiveToPassiveReplication(consistencyMgr, processTransactionHandler, l2Coordinator.getReplicatedClusterStateManager().getPassives(), this.persistor.getEntityPersistor(), replicationSender, this.getGroupManager());
+    processor.setReplication(passives);
+
+    Stage<ReplicationMessageAck> replicationStageAck = stageManager.createStage(ServerConfigurationContext.PASSIVE_REPLICATION_ACK_STAGE, ReplicationMessageAck.class,
         new AbstractEventHandler<ReplicationMessageAck>() {
           @Override
           public void handleEvent(ReplicationMessageAck context) throws EventHandlerException {
@@ -756,17 +760,17 @@ public class DistributedObjectServer implements TCDumper, ServerConnectionValida
           }
         }, 1, maxStageSize);
 
-//  handle cluster state    
+//  handle cluster state
     Sink<L2StateMessage> stateMessageSink = stageManager.createStage(ServerConfigurationContext.L2_STATE_MESSAGE_HANDLER_STAGE, L2StateMessage.class, new L2StateMessageHandler(), 1, maxStageSize).getSink();
     this.groupCommManager.routeMessages(L2StateMessage.class, stateMessageSink);
-//  handle passives    
+//  handle passives
     GroupEventsDispatchHandler dispatchHandler = new GroupEventsDispatchHandler();
-    dispatchHandler.addListener(this.l2Coordinator);  
+    dispatchHandler.addListener(this.l2Coordinator);
     dispatchHandler.addListener(passives);
-    
+
     Stage<GroupEvent> groupEvents = stageManager.createStage(ServerConfigurationContext.GROUP_EVENTS_DISPATCH_STAGE, GroupEvent.class, dispatchHandler, 1, maxStageSize);
     this.groupCommManager.registerForGroupEvents(dispatchHandler.createDispatcher(groupEvents.getSink()));
-  //  TODO:  These stages should probably be activated and destroyed dynamically    
+  //  TODO:  These stages should probably be activated and destroyed dynamically
 //  Replicated messages need to be ordered
     Sink<ReplicationMessage> replication = new OrderedSink<ReplicationMessage>(logger, replicationStage.getSink());
     this.groupCommManager.routeMessages(ReplicationMessage.class, replication);
@@ -774,7 +778,7 @@ public class DistributedObjectServer implements TCDumper, ServerConnectionValida
     this.groupCommManager.routeMessages(ReplicationMessageAck.class, replicationStageAck.getSink());
     Sink<PlatformInfoRequest> info = createPlatformInformationStages(stageManager, maxStageSize, monitoringShimService);
     dispatchHandler.addListener(connectPassiveEvents(info, haConfig.getNodesStore(), monitoringShimService));
-    
+
     final GlobalServerStatsImpl serverStats = new GlobalServerStatsImpl(globalObjectFaultCounter,
                                                                               globalTxnCounter,
                                                                               broadcastCounter,
@@ -796,7 +800,7 @@ public class DistributedObjectServer implements TCDumper, ServerConnectionValida
                                                                                                  reconnectTimeout,
                                                                                                  fast.getSink(),
                                                                                                  consoleLogger);
-    
+
     this.context = this.serverBuilder.createServerConfigurationContext(stageManager, channelManager,
                                                                        channelStats, this.l2Coordinator,
         clientHandshakeManager,
@@ -806,7 +810,7 @@ public class DistributedObjectServer implements TCDumper, ServerConnectionValida
     );
     toInit.add(this.serverBuilder);
 
-    startStages(stageManager, toInit);    
+    startStages(stageManager, toInit);
 
     // XXX: yucky casts
     this.managementContext = new ServerManagementContext((DSOChannelManagerMBean) channelManager,
@@ -836,17 +840,17 @@ public class DistributedObjectServer implements TCDumper, ServerConnectionValida
   }
 
   private Sink<PlatformInfoRequest> createPlatformInformationStages(StageManager stageManager, int maxStageSize, LocalMonitoringProducer monitoringSupport) {
-    Stage<PlatformInfoRequest> stage = stageManager.createStage(ServerConfigurationContext.PLATFORM_INFORMATION_REQUEST, 
+    Stage<PlatformInfoRequest> stage = stageManager.createStage(ServerConfigurationContext.PLATFORM_INFORMATION_REQUEST,
         PlatformInfoRequest.class, new PlatformInfoRequestHandler(groupCommManager, monitoringSupport).getEventHandler(), 1, maxStageSize);
     groupCommManager.routeMessages(PlatformInfoRequest.class, stage.getSink());
 //  publish state change events to everyone in the stripe
     return stage.getSink();
   }
-  
+
   private void startStages(StageManager stageManager, List<PostInit> toInit) {
-//  exclude from startup specific stages that are controlled by the stage controller. 
+//  exclude from startup specific stages that are controlled by the stage controller.
     // NOTE:  PASSIVE_OUTGOING_RESPONSE_STAGE must be active whenever PASSIVE_REPLICATION_STAGE is.
-    stageManager.startAll(this.context, toInit, 
+    stageManager.startAll(this.context, toInit,
         ServerConfigurationContext.SINGLE_THREADED_FAST_PATH,
         ServerConfigurationContext.REQUEST_PROCESSOR_DURING_SYNC_STAGE,
         ServerConfigurationContext.HYDRATE_MESSAGE_STAGE,
@@ -858,7 +862,7 @@ public class DistributedObjectServer implements TCDumper, ServerConnectionValida
         ServerConfigurationContext.PASSIVE_REPLICATION_ACK_STAGE
     );
   }
-  
+
   private void flushLocalPipeline(EntityID eid, FetchID fetch, ServerEntityAction action) {
     switch(action) {
       case CREATE_ENTITY:
@@ -895,7 +899,7 @@ public class DistributedObjectServer implements TCDumper, ServerConnectionValida
 
   private StageController createStageController(LocalMonitoringProducer monitoringSupport) {
     StageController control = new StageController();
-//  PASSIVE-UNINITIALIZED handle replicate messages right away. 
+//  PASSIVE-UNINITIALIZED handle replicate messages right away.
     // NOTE:  PASSIVE_OUTGOING_RESPONSE_STAGE must be active whenever PASSIVE_REPLICATION_STAGE is.
     control.addStageToState(ServerMode.UNINITIALIZED.getState(), ServerConfigurationContext.PASSIVE_REPLICATION_STAGE);
     control.addStageToState(ServerMode.UNINITIALIZED.getState(), ServerConfigurationContext.PASSIVE_OUTGOING_RESPONSE_STAGE);
@@ -905,7 +909,7 @@ public class DistributedObjectServer implements TCDumper, ServerConnectionValida
 //  REPLICATION needs to continue in STANDBY so include that stage here. SYNC goes away
     control.addStageToState(ServerMode.PASSIVE.getState(), ServerConfigurationContext.PASSIVE_REPLICATION_STAGE);
     control.addStageToState(ServerMode.PASSIVE.getState(), ServerConfigurationContext.PASSIVE_OUTGOING_RESPONSE_STAGE);
-//  turn on the process transaction handler, the active to passive driver, and the replication ack handler, replication handler needs to be shutdown and empty for 
+//  turn on the process transaction handler, the active to passive driver, and the replication ack handler, replication handler needs to be shutdown and empty for
 //  active to start
     control.addStageToState(ServerMode.ACTIVE.getState(), ServerConfigurationContext.SINGLE_THREADED_FAST_PATH);
     control.addStageToState(ServerMode.ACTIVE.getState(), ServerConfigurationContext.REQUEST_PROCESSOR_DURING_SYNC_STAGE);
@@ -919,19 +923,19 @@ public class DistributedObjectServer implements TCDumper, ServerConnectionValida
   // transition the local monitoring producer to active so the tree is rebuilt as a new active of the stripe
       monitoringSupport.serverIsActive();
       PlatformInfoRequest req = PlatformInfoRequest.createEmptyRequest();
-  //  due to the broadcast nature of this call, it is possible to get multiple 
+  //  due to the broadcast nature of this call, it is possible to get multiple
   //  responses from the same server.  The underlying collector must tolerate this
       groupCommManager.sendAll(req);  //  request info from all the other servers
     });
     return control;
   }
-  
+
   private GroupEventsListener connectPassiveEvents(Sink<PlatformInfoRequest> infoHandler, NodesStore nodesStore, LocalMonitoringProducer monitoringShimService) {
     return new GroupEventsListener() {
 
       @Override
       public void nodeJoined(NodeID nodeID) {
-        if (l2Coordinator.getStateManager().isActiveCoordinator()) {          
+        if (l2Coordinator.getStateManager().isActiveCoordinator()) {
           // Note that this passive may have joined in the time between when we decided to enter the active state and
           // when we ran the event to initialize LocalMonitoringProducer to receive events, as an active.
           // In those cases, we should avoid sending the request to this passive as we will send it to all of them, when
@@ -961,15 +965,15 @@ public class DistributedObjectServer implements TCDumper, ServerConnectionValida
       }
     };
   }
-  
+
   private void connectServerStateToReplicatedState(ProcessTransactionHandler pth, StateManager mgr, ClientEntityStateManager clients, ReplicatedClusterStateManager rcs) {
     mgr.registerForStateChangeEvents(new StateChangeListener() {
       @Override
       public void l2StateChanged(StateChangedEvent sce) {
         rcs.setCurrentState(sce.getCurrentState());
         final Set<ClientID> existingConnections = new HashSet<>(persistor.getClientStatePersistor().loadAllClientIDs());
-//  must do this because the replicated state when it comes to clients, may not include all the references 
-//  to clients that were in the midst of cleaning up after disconnection.  
+//  must do this because the replicated state when it comes to clients, may not include all the references
+//  to clients that were in the midst of cleaning up after disconnection.
         existingConnections.addAll(clients.clearClientReferences());
         if (sce.movedToActive()) {
           getContext().getClientHandshakeManager().setStarting(existingConnections);
@@ -983,7 +987,7 @@ public class DistributedObjectServer implements TCDumper, ServerConnectionValida
       }
     });
   }
-  
+
   public void startGroupManagers() {
     try {
 
@@ -1054,7 +1058,7 @@ public class DistributedObjectServer implements TCDumper, ServerConnectionValida
 
   private void startActiveMode(ProcessTransactionHandler pth, boolean wasStandby) {
     if (!wasStandby && persistor.getClusterStatePersistor().getInitialState() == null) {
-      
+
       Sink<VoltronEntityMessage> msgSink = this.seda.getStageManager().getStage(ServerConfigurationContext.SINGLE_THREADED_FAST_PATH, VoltronEntityMessage.class).getSink();
       Map<EntityID, VoltronEntityMessage> checkdups = new HashMap<>();
 //  find annotated permanent entities
@@ -1062,7 +1066,7 @@ public class DistributedObjectServer implements TCDumper, ServerConnectionValida
       for (VoltronEntityMessage vem : annotated) {
 //  map them to weed out duplicates
         checkdups.put(vem.getEntityDescriptor().getEntityID(), vem);
-      } 
+      }
       for (VoltronEntityMessage vem : checkdups.values()) {
         msgSink.addToSink(vem);
       }
@@ -1091,7 +1095,7 @@ public class DistributedObjectServer implements TCDumper, ServerConnectionValida
         this.l1Listener.start(existingConnections);
         clientBound = true;
       } catch (BindException bind) {
-  // this seems to happen on windows but should not.  we just gave up the port.  
+  // this seems to happen on windows but should not.  we just gave up the port.
   // loop forever as a hack.
         logger.warn("client server port not available for binding:", bind);
         try {
@@ -1112,7 +1116,7 @@ public class DistributedObjectServer implements TCDumper, ServerConnectionValida
   public void startDiagnosticListener() throws IOException {
     this.l1Diagnostics.start(Collections.emptySet());
   }
-  
+
   private static String format(NetworkListener listener) {
     final StringBuilder sb = new StringBuilder(listener.getBindAddress().getHostAddress());
     sb.append(':');

@@ -76,7 +76,7 @@ public class TerracottaServiceProviderRegistryImpl implements TerracottaServiceP
     }
     loadClasspathBuiltins(loader, platformConfiguration);
   }
-  
+
   private void loadClasspathBuiltins(ClassLoader loader, PlatformConfiguration platformConfiguration) {
     List<Class<? extends ServiceProvider>> providers = TCServerMain.getSetupManager().getServiceLocator().getImplementations(ServiceProvider.class, loader);
     for (Class<? extends ServiceProvider> clazz : providers) {
@@ -97,6 +97,10 @@ public class TerracottaServiceProviderRegistryImpl implements TerracottaServiceP
         logger.error("caught exception while initializing service " + clazz, i);
       }
     }
+  }
+
+  private void loadDynamicServices(ClassLoader loader, PlatformConfiguration platformConfiguration){
+
   }
 
   @Override

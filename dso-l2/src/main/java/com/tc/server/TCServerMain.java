@@ -21,6 +21,7 @@ package com.tc.server;
 import com.tc.classloader.ServiceLocator;
 import com.tc.config.schema.setup.ConfigurationSetupManagerFactory;
 import com.tc.config.schema.setup.L2ConfigurationSetupManager;
+import com.tc.config.schema.setup.L2DynamicConfigurationSetupManager;
 import com.tc.config.schema.setup.StandardConfigurationSetupManagerFactory;
 import com.tc.l2.logging.TCLogbackLogging;
 import com.tc.lang.TCThreadGroup;
@@ -46,6 +47,7 @@ public class TCServerMain {
 
   public static TCServer server;
   public static L2ConfigurationSetupManager setup;
+  public static L2DynamicConfigurationSetupManager dynamicSetup;
 
   public static void main(String[] args) {
     writeVersion();
@@ -65,12 +67,13 @@ public class TCServerMain {
 //  set this as the context loader for creation of all the infrastructure at bootstrap time.
 
       setup = factory.createL2TVSConfigurationSetupManager(null, systemLoader);
+      dynamicSetup = factory.createL2DynamicConfigurationSetupManager(systemLoader);
 
       TCLogbackLogging.redirectLogging(setup.commonl2Config().logsPath().getCanonicalPath());
 
       writeSystemProperties();
 
-      server = ServerFactory.createServer(setup,threadGroup);
+      server = ServerFactory.createServer(setup,dynamicSetup,threadGroup);
       server.start();
 
       server.waitUntilShutdown();
@@ -79,13 +82,17 @@ public class TCServerMain {
       throwableHandler.handleThrowable(Thread.currentThread(), t);
     }
   }
-  
+
   public static TCServer getServer() {
     return server;
   }
-  
+
   public static L2ConfigurationSetupManager getSetupManager() {
     return setup;
+  }
+
+  public static L2DynamicConfigurationSetupManager getDynamicSetupManager(){
+    return dynamicSetup;
   }
 
   private static void writeVersion() {

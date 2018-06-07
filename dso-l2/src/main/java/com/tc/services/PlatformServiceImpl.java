@@ -18,6 +18,7 @@
  */
 package com.tc.services;
 
+import com.tc.config.schema.setup.DynamicConfigurationRepository;
 import com.tc.management.beans.TCDumper;
 import com.tc.server.TCServerMain;
 import java.io.InputStream;
@@ -38,9 +39,21 @@ public class PlatformServiceImpl implements PlatformService {
     public void dumpPlatformState() {
         this.tcDumper.dump();
     }
-    
+
     @Override
     public InputStream getPlatformConfiguration() {
       return TCServerMain.getSetupManager().rawConfigFile();
+    }
+
+    @Override
+    public <T> T getDynamicConfiguration(final Class<T> type) {
+        DynamicConfigurationRepository repository = TCServerMain.getDynamicSetupManager().getConfigurationRepository();
+        return repository.getConfiguration(type);
+    }
+
+    @Override
+    public <T> void updateDynamicConfiguration(T entity) {
+        DynamicConfigurationRepository repository = TCServerMain.getDynamicSetupManager().getConfigurationRepository();
+        repository.saveConfiguration(entity);
     }
 }

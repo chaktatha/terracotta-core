@@ -38,4 +38,7 @@ public interface ConfigurationSetupManagerFactory {
    */
   L2ConfigurationSetupManager createL2TVSConfigurationSetupManager(String l2Name, ClassLoader loader)
       throws ConfigurationSetupException;
+
+  L2DynamicConfigurationSetupManager createL2DynamicConfigurationSetupManager(ClassLoader loader)
+      throws ConfigurationSetupException;
 }

@@ -35,7 +35,7 @@ import java.util.regex.Pattern;
 /**
  * Data conversion algorithms and whatnot can be found in java.io.DataInput and java.io.DataOutput. Contains methods for
  * converting from one kind of thing to another.
- * 
+ *
  * @author orion
  */
 public class Conversion {
@@ -124,7 +124,7 @@ public class Conversion {
 
   /**
    * Helper method to write a 4 byte unsigned integer value into a given byte array at a given offset
-   * 
+   *
    * @param l the unsigned int value to write
    * @param dest the byte array to write the uint into
    * @param index starting offset into the destination byte array
@@ -142,7 +142,7 @@ public class Conversion {
 
   /**
    * Helper method to write a 4 byte java (signed) integer value into a given byte array at a given offset
-   * 
+   *
    * @param i the signed int value to write
    * @param dest the byte array to write the uint into
    * @param index starting offset into the destination byte array
@@ -328,7 +328,7 @@ public class Conversion {
 
   /**
    * Converts a single byte to a hex string representation, can be decoded with Byte.parseByte().
-   * 
+   *
    * @param b the byte to encode
    * @return a
    */
@@ -442,6 +442,36 @@ public class Conversion {
     } else {
       double rv = (bytes / (GIGA.asBytes() * 1.0));
       return twoDForm.format(rv) + 'g';
+    }
+  }
+
+  public static String normalizeMemoryByte(long bytes) throws NumberFormatException {
+    if (bytes < KILO.asBytes()) {
+      return bytes + "b";
+    } else if (bytes < MEGA.asBytes()) {
+      if (bytes % KILO.asBytes() == 0) {
+        return bytes / KILO.asBytes() + "k";
+      }
+      return bytes + "b";
+    } else if (bytes < GIGA.asBytes()) {
+      if (bytes % MEGA.asBytes() == 0) {
+        return bytes / MEGA.asBytes() + "m";
+      }
+      if (bytes % KILO.asBytes() == 0) {
+        return bytes / KILO.asBytes() + "k";
+      }
+      return bytes + "b";
+    } else {
+      if (bytes % GIGA.asBytes() == 0) {
+        return bytes / GIGA.asBytes() + "g";
+      }
+      if (bytes % MEGA.asBytes() == 0) {
+        return bytes / MEGA.asBytes() + "m";
+      }
+      if (bytes % KILO.asBytes() == 0) {
+        return bytes / KILO.asBytes() + "k";
+      }
+      return bytes + "b";
     }
   }
 

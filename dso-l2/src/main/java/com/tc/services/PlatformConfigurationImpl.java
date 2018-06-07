@@ -22,19 +22,23 @@ import java.util.Collection;
 import org.terracotta.config.TcConfiguration;
 import org.terracotta.entity.PlatformConfiguration;
 
+import com.tc.config.schema.setup.DynamicConfigurationRepository;
 import com.tc.object.config.schema.L2Config;
 
 /**
  * @author vmad
  */
+
 public class PlatformConfigurationImpl implements PlatformConfiguration {
 
   private final L2Config l2Config;
   private final TcConfiguration config;
+  private final DynamicConfigurationRepository dynamicConfigurationRepository;
 
-  public PlatformConfigurationImpl(L2Config l2Config, TcConfiguration config) {
+  public PlatformConfigurationImpl(L2Config l2Config, TcConfiguration config, DynamicConfigurationRepository dynamicConfigurationRepository) {
     this.l2Config = l2Config;
     this.config = config;
+    this.dynamicConfigurationRepository = dynamicConfigurationRepository;
   }
 
   @Override
@@ -55,5 +59,10 @@ public class PlatformConfigurationImpl implements PlatformConfiguration {
   @Override
   public <T> Collection<T> getExtendedConfiguration(Class<T> type) {
     return config.getExtendedConfiguration(type);
+  }
+
+  @Override
+  public <T> T getDynamicConfiguration(final Class<T> type) {
+    return dynamicConfigurationRepository.getConfiguration(type);
   }
 }

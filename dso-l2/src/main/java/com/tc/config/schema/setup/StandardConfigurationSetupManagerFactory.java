@@ -179,4 +179,9 @@ public class StandardConfigurationSetupManagerFactory extends BaseConfigurationS
   public String[] getArguments() {
     return args;
   }
+
+  @Override
+  public L2DynamicConfigurationSetupManager createL2DynamicConfigurationSetupManager(final ClassLoader loader) throws ConfigurationSetupException {
+    return new L2DynamicConfigurationSetupManagerImpl(args, loader);
+  }
 }

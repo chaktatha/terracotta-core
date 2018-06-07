@@ -29,6 +29,7 @@ import com.tc.config.schema.L2Info;
 import com.tc.config.schema.ServerGroupInfo;
 import com.tc.config.schema.setup.ConfigurationSetupException;
 import com.tc.config.schema.setup.L2ConfigurationSetupManager;
+import com.tc.config.schema.setup.L2DynamicConfigurationSetupManager;
 import com.tc.l2.context.StateChangedEvent;
 import com.tc.l2.state.ServerMode;
 import com.tc.l2.state.StateChangeListener;
@@ -83,31 +84,33 @@ public class TCServerImpl extends SEDA implements TCServer, StateChangeListener 
 
   private final Object                      stateLock                                    = new Object();
   private ServerMode           serverState                                  = ServerMode.START;
-  
+
   private final L2ConfigurationSetupManager configurationSetupManager;
+  private final L2DynamicConfigurationSetupManager dynamicConfigurationSetupManager;
   protected final ConnectionPolicy          connectionPolicy;
   private boolean                           shutdown                                     = false;
 
   /**
    * This should only be used for tests.
    */
-  public TCServerImpl(L2ConfigurationSetupManager configurationSetupManager) {
-    this(configurationSetupManager, new TCThreadGroup(new ThrowableHandlerImpl(logger)));
+  public TCServerImpl(L2ConfigurationSetupManager configurationSetupManager, L2DynamicConfigurationSetupManager dynamicConfigurationSetupManager) {
+    this(configurationSetupManager, dynamicConfigurationSetupManager, new TCThreadGroup(new ThrowableHandlerImpl(logger)));
   }
 
-  public TCServerImpl(L2ConfigurationSetupManager configurationSetupManager, TCThreadGroup threadGroup) {
-    this(configurationSetupManager, threadGroup, new ConnectionPolicyImpl(Integer.MAX_VALUE));
+  public TCServerImpl(L2ConfigurationSetupManager configurationSetupManager, L2DynamicConfigurationSetupManager dynamicConfigurationSetupManager, TCThreadGroup threadGroup) {
+    this(configurationSetupManager, dynamicConfigurationSetupManager, threadGroup, new ConnectionPolicyImpl(Integer.MAX_VALUE));
   }
 
-  public TCServerImpl(L2ConfigurationSetupManager manager, TCThreadGroup group,
+  public TCServerImpl(L2ConfigurationSetupManager manager, L2DynamicConfigurationSetupManager dynamicConfigurationSetupManager, TCThreadGroup group,
                       ConnectionPolicy connectionPolicy) {
     super(group);
 
     this.connectionPolicy = connectionPolicy;
     Assert.assertNotNull(manager);
     this.configurationSetupManager = manager;
+    this.dynamicConfigurationSetupManager = dynamicConfigurationSetupManager;
   }
-  
+
   public synchronized void setState(ServerMode state) {
     if (!validateState(state)) { throw new AssertionError("Unrecognized server state: [" + state.getName() + "]"); }
 
@@ -211,7 +214,7 @@ public class TCServerImpl extends SEDA implements TCServer, StateChangeListener 
   public boolean canShutdown() {
     synchronized (this.stateLock) {
       return serverState == ServerMode.PASSIVE ||
-       serverState == ServerMode.ACTIVE || 
+       serverState == ServerMode.ACTIVE ||
        serverState == ServerMode.UNINITIALIZED ||
        serverState == ServerMode.SYNCING;
     }
@@ -322,12 +325,12 @@ public class TCServerImpl extends SEDA implements TCServer, StateChangeListener 
   public int getReconnectWindowTimeout() {
     return configurationSetupManager.dsoL2Config().clientReconnectWindow();
   }
-  
+
   @Override
   public State getState() {
     return this.serverState.getState();
   }
-  
+
   @Override
   public String toString() {
     StringBuffer buf = new StringBuffer();
@@ -386,9 +389,9 @@ public class TCServerImpl extends SEDA implements TCServer, StateChangeListener 
   }
 
   protected DistributedObjectServer createDistributedObjectServer(L2ConfigurationSetupManager configSetupManager,
-                                                                  ConnectionPolicy policy, 
+                                                                  ConnectionPolicy policy,
                                                                   TCServerImpl serverImpl) {
-    DistributedObjectServer dso = new DistributedObjectServer(configSetupManager, getThreadGroup(), policy, this, this);
+    DistributedObjectServer dso = new DistributedObjectServer(configSetupManager, dynamicConfigurationSetupManager, getThreadGroup(), policy, this, this);
     try {
       registerServerMBeans(dso, ManagementFactory.getPlatformMBeanServer());
     } catch (NotCompliantMBeanException | InstanceAlreadyExistsException | MBeanRegistrationException exp) {
@@ -412,13 +415,13 @@ public class TCServerImpl extends SEDA implements TCServer, StateChangeListener 
     MBeanServer mBeanServer = ManagementFactory.getPlatformMBeanServer();
     registerDSOMBeans(mgmtContext, configContext, dumper, mBeanServer);
   }
-  
-  protected void registerServerMBeans(TCDumper tcDumper, MBeanServer mBeanServer) 
+
+  protected void registerServerMBeans(TCDumper tcDumper, MBeanServer mBeanServer)
       throws NotCompliantMBeanException, InstanceAlreadyExistsException, MBeanRegistrationException {
     mBeanServer.registerMBean(new TCServerInfo(this), L2MBeanNames.TC_SERVER_INFO);
     mBeanServer.registerMBean(new L2Dumper(tcDumper, mBeanServer), L2MBeanNames.DUMPER);
   }
-  
+
   protected void unregisterServerMBeans(MBeanServer mbs) throws MBeanRegistrationException, InstanceNotFoundException {
     mbs.unregisterMBean(L2MBeanNames.TC_SERVER_INFO);
     mbs.unregisterMBean(L2MBeanNames.DUMPER);
@@ -484,5 +487,5 @@ public class TCServerImpl extends SEDA implements TCServer, StateChangeListener 
     synchronized (this.stateLock) {
       this.serverState = StateManager.convert(sce.getCurrentState());
     }
-  } 
+  }
 }
